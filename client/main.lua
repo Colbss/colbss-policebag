@@ -9,7 +9,7 @@ local prev_bag_tex = 0
 local bagShowing = false
 local hadBag = false
 
--- THREADS
+-- ################################ THREADS ################################
 
 Citizen.CreateThread(function()
 	while true do
@@ -17,14 +17,14 @@ Citizen.CreateThread(function()
 
 		local hasBag = QBCore.Functions.HasItem('policebag')
 
-		if not bagShowing and hasBag then
-			toggleBag(true)
-			bagShowing = true
-		elseif bagShowing and not hasBag then
-			if hadBag then
-				toggleBag(false)
-				bagShowing = false
-			end
+			if not bagShowing and hasBag then
+				toggleBag(true)
+				bagShowing = true
+			elseif bagShowing and not hasBag then
+				if hadBag then
+					toggleBag(false)
+					bagShowing = false
+				end
 		end
 	end
 end)
@@ -210,10 +210,7 @@ RegisterNetEvent('pb:client:PickupBag', function()
 
 	if hit and IsEntityAnObject(entity) and GetHashKey(bag_model) == GetEntityModel(entity) then
 
-		local ownerID = GetPlayerServerId(NetworkGetEntityOwner(entity))
-		local playerID = GetPlayerServerId(PlayerId())
-
-		if ownerID ~= playerID then
+		if bag_model == nil or NetworkGetNetworkIdFromEntity(entity) ~= NetworkGetNetworkIdFromEntity(bag_obj) then
 			QBCore.Functions.Notify("This is not your bag!", "error")
 			return
 		end
