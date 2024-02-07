@@ -4,6 +4,31 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local bag_obj = nil
 local bag_model = "prop_big_bag_01"
 
+local prev_bag = 0
+local prev_bag_tex = 0
+local bagShowing = false
+local hadBag = false
+
+-- THREADS
+
+Citizen.CreateThread(function()
+	while true do
+		Citizen.Wait(0)
+
+		local hasBag = QBCore.Functions.HasItem('policebag')
+
+		if not bagShowing and hasBag then
+			toggleBag(true)
+			bagShowing = true
+		elseif bagShowing and not hasBag then
+			if hadBag then
+				toggleBag(false)
+				bagShowing = false
+			end
+		end
+	end
+end)
+
 -- ################################ FUNCTIONS ################################
 
 local RotationToDirection = function(rotation)
@@ -37,6 +62,33 @@ local RayCastGamePlayCamera = function(distance)
 	}
 	local _, b, _, _, e = GetShapeTestResult(StartShapeTestRay(cameraCoord.x, cameraCoord.y, cameraCoord.z, destination.x, destination.y, destination.z, -1, PlayerPedId(), 0))
 	return b, e
+end
+
+function toggleBag(show)
+
+	local ped = PlayerPedId()
+	local PlayerData = QBCore.Functions.GetPlayerData()
+
+	if show then
+
+		prev_bag = GetPedDrawableVariation(ped, 5)
+		prev_bag_tex = GetPedTextureVariation(ped, 5)
+
+		if PlayerData.charinfo.gender == 0 then
+			print("Show Bag Male")
+			SetPedComponentVariation(ped, 5, Config.Bag_M, 0, 2)
+		else
+			print("Show Bag Female")
+			SetPedComponentVariation(ped, 5, Config.Bag_M, 0, 2)
+		end
+		hadBag = true
+	else
+
+		print("Prev Bag: " .. prev_bag .. " , Texture: " .. prev_bag_tex)
+		SetPedComponentVariation(ped, 5, prev_bag, prev_bag_tex, 2)
+
+	end
+
 end
 
 function DropBag(item) 
@@ -84,45 +136,47 @@ function DropBag(item)
 			PlaceObjectOnGroundProperly(bag_obj)
 			FreezeEntityPosition(bag_obj, true)
 
-			exports['qb-target']:AddTargetModel(bag_model, {
-				options = {
-					{
-						type = "client",
-						event = "pb:client:OpenBag",
-						icon = "fas fa-toolbox",
-						label = "Open Bag",
-						job = "police",
-					},
-					{
-						type = "client",
-						event = "pb:client:PickupBag",
-						icon = "fas fa-hand-peace",
-						label = "Take Bag",
-						job = "police",
-					},
-				},
-				distance = 2.0
-			})
-
-			-- Remove bag
-			QBCore.Functions.TriggerCallback("pb:server:RemoveBag", function(removed)
-				if not removed then
-					DeleteObject(bag_obj)
-				end
-			end, item)
-
 		end,
 		function(cancelled)
 			ClearPedTasks(ped)
         	StopAnimTask(ped, dropAnimDict, dropAnim, 1.0)
 			if cancelled then
-				print("Canceled")
 				if bag_obj ~= nil then
 					DeleteObject(bag_obj)
 					TriggerServerEvent('pb:server:AddBag')
 				end
 			else
-				print("Finished..")
+				if bag_obj ~= nil then
+
+					-- Remove bag
+					QBCore.Functions.TriggerCallback("pb:server:RemoveBag", function(removed)
+						if not removed then
+							DeleteObject(bag_obj)
+						end
+					end, item)
+					
+					exports['qb-target']:AddTargetModel(bag_model, {
+						options = {
+							{
+								type = "client",
+								event = "pb:client:OpenBag",
+								icon = "fas fa-toolbox",
+								label = "Open Bag",
+								job = "police",
+							},
+							{
+								type = "client",
+								event = "pb:client:PickupBag",
+								icon = "fas fa-hand-peace",
+								label = "Take Bag",
+								job = "police",
+							},
+						},
+						distance = 2.0
+					})
+
+				end
+				
 			end
 		end)
 
@@ -134,7 +188,6 @@ RegisterNetEvent('pb:client:UseBag', function(item)
 	local PlayerData = QBCore.Functions.GetPlayerData()
 
 	if PlayerData.job.name == "police" then
-		print("Bag Used")
 		DropBag(item)
 	else
 		QBCore.Functions.Notify("You cannot use this!", "error")
@@ -153,20 +206,23 @@ end)
 
 RegisterNetEvent('pb:client:PickupBag', function()
 
-	-- Check if space to add item
-
-	print("Trying to pickup bag ... ")
-
 	local hit, entity = RayCastGamePlayCamera(10.0)
 
 	if hit and IsEntityAnObject(entity) and GetHashKey(bag_model) == GetEntityModel(entity) then
+
+		local ownerID = GetPlayerServerId(NetworkGetEntityOwner(entity))
+		local playerID = GetPlayerServerId(PlayerId())
+
+		if ownerID ~= playerID then
+			QBCore.Functions.Notify("This is not your bag!", "error")
+			return
+		end
 
 		QBCore.Functions.TriggerCallback("pb:server:AddBag", function(added)
 
 			if added then
 				
 				local NetID = NetworkGetNetworkIdFromEntity(entity)
-
 				SetEntityAsMissionEntity(entity, true, true)
 				DeleteEntity(entity)
 
