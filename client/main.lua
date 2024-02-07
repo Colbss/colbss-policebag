@@ -130,6 +130,12 @@ function DropBag(item)
 		propTwo = {}
 	 }, function()
 
+			-- If a new bag is placed, delete old one
+			if bag_obj ~= nil then
+				SetEntityAsMissionEntity(bag_obj, true, true)
+				DeleteEntity(bag_obj)
+			end
+
 			--TaskPlayAnim(ped, dropAnimDict, dropAnim, 8.0, 8.0, -1, 1, 0, false, false, false)
 			bag_obj = CreateObject(bag_model, x, y, z, true, true, true)
 			SetEntityHeading(bag_obj, heading)
